@@ -85,7 +85,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* 4 THẺ KPI CHÍNH */}
+      {/* 4 Thẻ KPI chính */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
           <div className="flex justify-between items-center text-slate-400 mb-2">
@@ -139,14 +139,14 @@ export default function Home() {
         </div>
       </div>
 
-      {/* KHUNG THỐNG KÊ LƯỢT SỬ DỤNG API KEY */}
+      {/* THỐNG KÊ LƯỢT GỌI API KEY */}
       <div className="mb-8 bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
             <Key className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">Thống Kê Lượt Gọi API KEY (Tiêu thụ mỗi lượt quét)</h3>
+            <h3 className="text-sm font-semibold text-white">Thống Kê Lượt Gọi API KEY (Tiêu thụ lượt quét)</h3>
             <p className="text-xs text-slate-400">Tổng số request API thực thi để tổng hợp và phân tích báo cáo real-time</p>
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function Home() {
       {data?.articles && data.articles.length > 0 && (
         <div className="mb-8 bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center justify-between">
-            <span>Danh Sách Bài Viết Thu Thập Được ({data.articles.length} bài)</span>
+            <span>Danh Sách Bài Viết & Bài Đăng Thảo Luận Thu Thập Được ({data.articles.length} bài)</span>
             <span className="text-xs font-normal text-slate-400">Phân loại nguồn tin & Sắc thái</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
