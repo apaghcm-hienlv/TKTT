@@ -23,16 +23,18 @@ export async function POST(req: Request) {
     const { query } = await req.json();
     if (!query) return NextResponse.json({ error: 'Từ khóa trống' }, { status: 400 });
 
-    const mainKeyword = query.trim();
+    // Loại bỏ dấu ngoặc kép thừa để Google không bị bó hẹp kết quả
+    const cleanQuery = query.replace(/["']/g, '').trim();
     const headers = { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' };
 
-    // Tối ưu bộ truy vấn đa kênh
+    // Bộ truy vấn tìm kiếm linh hoạt (Flexible Search)
     const targetQueries = [
-      axios.post('https://google.serper.dev/news', { q: `"${mainKeyword}"`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
-      axios.post('https://google.serper.dev/search', { q: `"${mainKeyword}" "Phân hiệu" OR "Học viện" OR "Sông Dương"`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
-      axios.post('https://google.serper.dev/search', { q: `"${mainKeyword}" site:facebook.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
-      axios.post('https://google.serper.dev/search', { q: `"${mainKeyword}" site:tiktok.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
-      axios.post('https://google.serper.dev/search', { q: `"${mainKeyword}" site:youtube.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/news', { q: cleanQuery, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/search', { q: `${cleanQuery} tin tức`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/search', { q: `${cleanQuery} site:facebook.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/search', { q: `${cleanQuery} site:tiktok.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/search', { q: `${cleanQuery} site:youtube.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }),
+      axios.post('https://google.serper.dev/search', { q: cleanQuery, gl: 'vn', hl: 'vi', num: 40, page: 2 }, { headers }),
     ];
 
     const responses = await Promise.allSettled(targetQueries);
@@ -59,7 +61,7 @@ export async function POST(req: Request) {
 
     const uniqueArticles = Array.from(articleMap.values());
     if (uniqueArticles.length === 0) {
-      return NextResponse.json({ error: 'Không tìm thấy dữ liệu bài viết.' }, { status: 404 });
+      return NextResponse.json({ error: 'Không tìm thấy dữ liệu. Hãy thử rút ngắn từ khóa tìm kiếm.' }, { status: 404 });
     }
 
     const topSourcesList = Object.entries(sourceStats)
@@ -71,29 +73,28 @@ export async function POST(req: Request) {
         note: name.includes('Báo') ? 'Cơ quan báo chí chính thống' : 'Mạng xã hội / Thảo luận'
       }));
 
-    // Prompt phân tích chuyên sâu cho APAG.HCM
     const prompt = `
-      Bạn là chuyên gia giám sát truyền thông của Phân hiệu Học viện Hành chính và Quản trị công tại TP.HCM (APAG.HCM).
-      Hãy phân tích danh sách bài viết về chủ đề: "${mainKeyword}".
+      Bạn là chuyên gia giám sát truyền thông của APAG.HCM.
+      Hãy phân tích danh sách bài viết về chủ đề: "${cleanQuery}".
       Danh sách bài viết: ${JSON.stringify(uniqueArticles.slice(0, 25))}
 
       Trả về DUY NHẤT 1 chuỗi JSON:
       {
         "crisis_level": "THẤP" hoặc "TRUNG BÌNH" hoặc "CAO",
-        "crisis_trend": "Đánh giá xu hướng dư luận đối với Phân hiệu APAG.HCM",
+        "crisis_trend": "Tóm tắt xu hướng dư luận về ${cleanQuery}",
         "phases": [
           { "phase": 1, "title": "Giai đoạn 1: Khởi phát thông tin", "desc": "Mô tả ngắn diễn biến", "tag": "Khởi phát" },
           { "phase": 2, "title": "Giai đoạn 2: Lan truyền & Phản hồi", "desc": "Mô tả ngắn diễn biến", "tag": "Lan truyền" },
           { "phase": 3, "title": "Giai đoạn 3: Trọng tâm hiện tại", "desc": "Mô tả ngắn diễn biến", "tag": "Hiện tại" }
         ],
         "risks": [
-          { "name": "1. Rủi ro về dư luận truyền thông", "desc": "Tác động tới uy tín Phân hiệu", "level": "Trung bình" },
-          { "name": "2. Rủi ro quản lý tài sản công / pháp lý", "desc": "Các câu hỏi báo chí có thể đặt ra", "level": "Cao" }
+          { "name": "1. Rủi ro về dư luận truyền thông", "desc": "Tác động tới uy tín Phân hiệu APAG.HCM", "level": "Trung bình" },
+          { "name": "2. Rủi ro về quản lý tài sản / pháp lý", "desc": "Các vấn đề dư luận hoặc báo chí chú ý", "level": "Cao" }
         ],
         "recommendations": [
-          "Khuyến nghị 1 cho Phân hiệu APAG.HCM",
-          "Khuyến nghị 2 cho Phân hiệu APAG.HCM",
-          "Khuyến nghị 3 cho Phân hiệu APAG.HCM"
+          "Khuyến nghị 1 xử lý truyền thông",
+          "Khuyến nghị 2 xử lý truyền thông",
+          "Khuyến nghị 3 xử lý truyền thông"
         ],
         "articles_analysis": [
           { "id": 0, "sentiment": "positive" hoặc "neutral" hoặc "negative", "summary": "Tóm tắt ngắn bài viết" }
@@ -114,7 +115,7 @@ export async function POST(req: Request) {
       );
       aiOutput = JSON.parse(groqRes.data.choices[0]?.message?.content || '{}');
     } catch (err) {
-      console.warn('AI response error:', err);
+      console.warn('AI Error:', err);
     }
 
     const analysisMap = new Map((aiOutput.articles_analysis || []).map((a: any) => [a.id, a]));
@@ -142,7 +143,7 @@ export async function POST(req: Request) {
           negative: Math.round((negCount / enrichedArticles.length) * 100) || 0,
         },
         crisis_level: aiOutput.crisis_level || 'TRUNG BÌNH',
-        crisis_trend: aiOutput.crisis_trend || `Đang theo dõi thông tin truyền thông về ${mainKeyword}.`,
+        crisis_trend: aiOutput.crisis_trend || `Đang theo dõi thông tin về ${cleanQuery}.`,
       },
       phases: aiOutput.phases || [],
       top_sources: topSourcesList,
