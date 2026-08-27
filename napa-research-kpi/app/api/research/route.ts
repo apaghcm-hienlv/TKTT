@@ -34,11 +34,10 @@ export async function POST(req: Request) {
     if (!query) return NextResponse.json({ error: 'Từ khóa không được để trống' }, { status: 400 });
 
     const rawQuery = query.replace(/["']/g, '').trim();
-    // Tách từ khóa chính để mở rộng phạm vi cào
     const mainWord = rawQuery.split(' ')[0] || rawQuery;
     const headers = { 'X-API-KEY': process.env.SERPER_API_KEY, 'Content-Type': 'application/json' };
 
-    // 1. Quét đa chiều 8 luồng song song để lấy tối đa bài viết
+    // 1. Quét dữ liệu đa kênh
     const targetQueries = [
       axios.post('https://google.serper.dev/news', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
       axios.post('https://google.serper.dev/news', { q: mainWord, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
@@ -80,7 +79,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Không tìm thấy dữ liệu bài viết.' }, { status: 404 });
     }
 
-    // Top các nguồn tin
     const topSourcesList = Object.entries(sourceStats)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
@@ -90,7 +88,7 @@ export async function POST(req: Request) {
         note: name.includes('Báo') ? 'Cơ quan báo chí chính thống' : 'Mạng xã hội / Kênh thảo luận'
       }));
 
-    // 2. Phân tích AI với Groq AI
+    // 2. Groq AI Phân tích
     let aiOutput: any = null;
     try {
       const prompt = `
@@ -131,32 +129,20 @@ export async function POST(req: Request) {
 
       aiOutput = JSON.parse(groqRes.data.choices[0]?.message?.content || '{}');
     } catch (err) {
-      console.warn('Groq AI timeout, activating dynamic analyzer fallback');
+      console.warn('Groq AI fallback');
     }
 
-    // 3. Lớp dự phòng tự động phân tích nếu AI quá tải (Đảm bảo 100% không bao giờ trắng trang)
-    const phases = aiOutput?.phases?.length ? aiOutput.phases : [
-      { phase: 1, title: 'Giai đoạn 1: Khởi phát thông tin', desc: `Báo chí và các trang tin ghi nhận các sự việc ban đầu liên quan đến ${rawQuery}.`, tag: 'Khởi phát' },
-      { phase: 2, title: 'Giai đoạn 2: Tiếp nhận thông tin phản hồi', desc: `Cung cấp các dữ kiện pháp lý, hợp đồng và thông tin chính thức để cân bằng dư luận.`, tag: 'Làm rõ' },
-      { phase: 3, title: 'Giai đoạn 3: Dư luận ổn định & Theo dõi', desc: `Trọng tâm chuyển sang trách nhiệm của các bên liên quan và phương án xử lý tiếp theo.`, tag: 'Hiện tại' }
-    ];
-
-    const risks = aiOutput?.risks?.length ? aiOutput.risks : [
-      { name: '1. Rủi ro hiểu nhầm từ tiêu đề báo chí', desc: `Các tiêu đề giật gân về ${rawQuery} khiến độc giả lướt qua dễ hiểu sai bản chất sự việc.`, level: 'Trung bình' },
-      { name: '2. Rủi ro tin đồn trên mạng xã hội', desc: `Các bình luận và bài đăng chia sẻ lại trên Facebook/TikTok có thể thêu dệt thông tin thiếu kiểm chứng.`, level: 'Cao' }
-    ];
-
-    const recommendations = aiOutput?.recommendations?.length ? aiOutput.recommendations : [
-      `Duy trì một đầu mối phát ngôn chính thức duy nhất về vụ việc ${rawQuery}.`,
-      `Chủ động gửi thông tin đính chính đến các cơ quan báo chí đưa tin chưa chính xác.`,
-      `Tiếp tục duy trì truyền thông các hoạt động tích cực thường kỳ của Phân hiệu.`
-    ];
-
-    // Thống kê sắc thái
-    let posCount = 0, neuCount = 0, negCount = 0, socialCount = 0;
+    // 3. Đếm chi tiết từng loại KPI
+    let posCount = 0, neuCount = 0, negCount = 0;
+    let fbCount = 0, tiktokCount = 0, ytCount = 0, newsCount = 0;
 
     const enrichedArticles = uniqueArticles.map((art) => {
-      if (['Facebook', 'TikTok', 'YouTube'].includes(art.source)) socialCount++;
+      const src = art.source;
+      if (src === 'Facebook') fbCount++;
+      else if (src === 'TikTok') tiktokCount++;
+      else if (src === 'YouTube') ytCount++;
+      else newsCount++;
+
       const titleLower = art.title.toLowerCase();
       let sentiment = 'neutral';
 
@@ -173,22 +159,31 @@ export async function POST(req: Request) {
       return { ...art, sentiment, summary: art.snippet };
     });
 
+    const total = enrichedArticles.length;
+
     return NextResponse.json({
       kpi_summary: {
-        total_articles: enrichedArticles.length,
-        social_count: socialCount,
+        total_articles: total,
+        news_count: newsCount,
+        social_count: fbCount + tiktokCount + ytCount,
+        facebook_count: fbCount,
+        tiktok_count: tiktokCount,
+        youtube_count: ytCount,
+        positive_count: posCount,
+        neutral_count: neuCount,
+        negative_count: negCount,
         sentiment_ratio: {
-          positive: Math.round((posCount / enrichedArticles.length) * 100) || 15,
-          neutral: Math.round((neuCount / enrichedArticles.length) * 100) || 60,
-          negative: Math.round((negCount / enrichedArticles.length) * 100) || 25,
+          positive: Math.round((posCount / total) * 100) || 0,
+          neutral: Math.round((neuCount / total) * 100) || 0,
+          negative: Math.round((negCount / total) * 100) || 0,
         },
         crisis_level: aiOutput?.crisis_level || 'TRUNG BÌNH',
         crisis_trend: aiOutput?.crisis_trend || `Theo dõi diễn biến thông tin truyền thông liên quan đến ${rawQuery}.`,
       },
-      phases,
+      phases: aiOutput?.phases || [],
       top_sources: topSourcesList,
-      risks,
-      recommendations,
+      risks: aiOutput?.risks || [],
+      recommendations: aiOutput?.recommendations || [],
       articles: enrichedArticles,
     });
   } catch (error: any) {
