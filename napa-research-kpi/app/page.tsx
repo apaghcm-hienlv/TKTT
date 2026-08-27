@@ -14,7 +14,9 @@ import {
   Search,
   Loader2,
   ExternalLink,
-  Key
+  Key,
+  Copy,
+  Layers
 } from 'lucide-react';
 
 export default function Home() {
@@ -37,6 +39,7 @@ export default function Home() {
     }
   };
 
+  const kpi = data?.kpi_summary;
   const usage = data?.api_usage;
 
   return (
@@ -85,69 +88,78 @@ export default function Home() {
         </div>
       )}
 
-      {/* 4 Thẻ KPI chính */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* CÁC THẺ KPI TỔNG DUNG LƯỢNG PHỦ SÓNG (GROSS COVERAGE) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {/* Gross Mentions */}
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
           <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-sm font-medium">Báo chí & Trang tin</span>
-            <Newspaper className="w-5 h-5 text-blue-400" />
+            <span className="text-sm font-medium">Tổng Lượt Phủ (Gross)</span>
+            <Layers className="w-5 h-5 text-blue-400" />
           </div>
           <div className="text-3xl font-bold text-white">
-            {data?.kpi_summary?.total_articles || '0'} <span className="text-lg text-slate-400 font-normal">URLs</span>
+            {kpi?.total_mentions || '0'} <span className="text-lg text-slate-400 font-normal">lượt</span>
           </div>
-          <p className="text-xs text-slate-400 mt-2">Bài viết định danh thu thập được</p>
+          <p className="text-xs text-blue-400 mt-2">Bao gồm bài gốc + copy + đăng lại</p>
         </div>
 
+        {/* Original Posts */}
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
+          <div className="flex justify-between items-center text-slate-400 mb-2">
+            <span className="text-sm font-medium">Bài Độc Lập (Nguồn gốc)</span>
+            <Newspaper className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div className="text-3xl font-bold text-emerald-400">
+            {kpi?.original_count || '0'} <span className="text-lg text-slate-400 font-normal">bài</span>
+          </div>
+          <p className="text-xs text-slate-400 mt-2">Bài báo & nội dung gốc ban đầu</p>
+        </div>
+
+        {/* Syndicated Posts */}
+        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
+          <div className="flex justify-between items-center text-slate-400 mb-2">
+            <span className="text-sm font-medium">Lượt Copy / Đăng Lại</span>
+            <Copy className="w-5 h-5 text-purple-400" />
+          </div>
+          <div className="text-3xl font-bold text-purple-400">
+            {kpi?.syndicated_count || '0'} <span className="text-lg text-slate-400 font-normal">lượt</span>
+          </div>
+          <p className="text-xs text-purple-300/80 mt-2">Bài viết dẫn lại trên trang tin/MXH</p>
+        </div>
+
+        {/* Social Posts */}
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-sm font-medium">Mạng Xã Hội</span>
             <Share2 className="w-5 h-5 text-indigo-400" />
           </div>
-          <div className="text-3xl font-bold text-white">
-            {data?.kpi_summary?.social_count || '0'} <span className="text-lg text-slate-400 font-normal">Bài</span>
+          <div className="text-3xl font-bold text-indigo-400">
+            {kpi?.social_count || '0'} <span className="text-lg text-slate-400 font-normal">bài</span>
           </div>
-          <p className="text-xs text-amber-400 mt-2">Bài đăng Facebook, TikTok, YouTube</p>
+          <p className="text-xs text-amber-400 mt-2">Facebook, TikTok, YouTube</p>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
-          <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-sm font-medium">Mức độ Khủng hoảng</span>
-            <TrendingDown className="w-5 h-5 text-emerald-400" />
-          </div>
-          <div className={`text-2xl font-bold ${
-            data?.kpi_summary?.crisis_level === 'CAO' ? 'text-red-400' :
-            data?.kpi_summary?.crisis_level === 'TRUNG BÌNH' ? 'text-amber-400' : 'text-emerald-400'
-          }`}>
-            {data?.kpi_summary?.crisis_level || 'CHƯA QUÉT'}
-          </div>
-          <p className="text-xs text-slate-400 mt-2 line-clamp-1">
-            {data?.kpi_summary?.crisis_trend || 'Đang chờ phân tích dữ liệu'}
-          </p>
-        </div>
-
+        {/* Negative Sentiment */}
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
           <div className="flex justify-between items-center text-slate-400 mb-2">
             <span className="text-sm font-medium">Tỷ lệ Tiêu cực (Negative)</span>
             <AlertTriangle className="w-5 h-5 text-red-400" />
           </div>
           <div className="text-3xl font-bold text-red-400">
-            {data?.kpi_summary?.sentiment_ratio?.negative || 0}%
+            {kpi?.sentiment_ratio?.negative || 0}%
           </div>
-          <p className="text-xs text-slate-400 mt-2">
-            Tích cực: {data?.kpi_summary?.sentiment_ratio?.positive || 0}% | Trung tính: {data?.kpi_summary?.sentiment_ratio?.neutral || 0}%
-          </p>
+          <p className="text-xs text-slate-400 mt-2">Tích cực: {kpi?.sentiment_ratio?.positive || 0}% | Trung tính: {kpi?.sentiment_ratio?.neutral || 0}%</p>
         </div>
       </div>
 
-      {/* THỐNG KÊ LƯỢT GỌI API KEY */}
+      {/* THỐNG KÊ API KEY USAGE */}
       <div className="mb-8 bg-slate-900/80 border border-slate-800 rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
             <Key className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-semibold text-white">Thống Kê Lượt Gọi API KEY (Tiêu thụ lượt quét)</h3>
-            <p className="text-xs text-slate-400">Tổng số request API thực thi để tổng hợp và phân tích báo cáo real-time</p>
+            <h3 className="text-sm font-semibold text-white">Thống Kê Lượt Gọi API KEY (Tiêu thụ mỗi lượt quét)</h3>
+            <p className="text-xs text-slate-400">Tổng số request API thực thi để quét đa chiều và phân tích báo cáo real-time</p>
           </div>
         </div>
 
@@ -200,7 +212,7 @@ export default function Home() {
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-indigo-400" />
-            Top Nguồn Tin Thu Thập Được
+            Top Nguồn Tin & Lượt Dẫn Lại
           </h2>
 
           <div className="space-y-4">
@@ -221,21 +233,28 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Danh sách bài viết thu thập */}
+      {/* Danh sách toàn bộ bài viết (Cả bài độc lập lẫn bài copy/đăng lại) */}
       {data?.articles && data.articles.length > 0 && (
         <div className="mb-8 bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center justify-between">
-            <span>Danh Sách Bài Viết & Bài Đăng Thảo Luận Thu Thập Được ({data.articles.length} bài)</span>
-            <span className="text-xs font-normal text-slate-400">Phân loại nguồn tin & Sắc thái</span>
+            <span>Toàn Bộ Bài Viết Xuất Hiện ({data.articles.length} bài & lượt đăng lại)</span>
+            <span className="text-xs font-normal text-slate-400">Ghi nhận bài gốc và các lượt copy/dẫn lại</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
             {data.articles.map((art: any, idx: number) => (
               <div key={idx} className="p-4 bg-slate-950 rounded-lg border border-slate-800 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start gap-2 mb-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-blue-300">
-                      {art.source}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-blue-300">
+                        {art.source}
+                      </span>
+                      {art.is_syndicated && (
+                        <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          Đăng lại / Copy
+                        </span>
+                      )}
+                    </div>
                     <span className={`text-xs px-2 py-0.5 rounded font-medium ${
                       art.sentiment === 'positive' ? 'bg-emerald-500/10 text-emerald-400' :
                       art.sentiment === 'negative' ? 'bg-red-500/10 text-red-400' : 'bg-slate-500/10 text-slate-400'
@@ -252,7 +271,7 @@ export default function Home() {
                   rel="noreferrer"
                   className="mt-3 text-xs text-blue-400 hover:underline flex items-center gap-1"
                 >
-                  Xem bài gốc <ExternalLink className="w-3 h-3" />
+                  Xem bài gốc / bài dẫn <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
             ))}
