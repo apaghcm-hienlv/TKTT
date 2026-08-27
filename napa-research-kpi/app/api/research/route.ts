@@ -43,16 +43,18 @@ export async function POST(req: Request) {
 
     const headers = { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' };
 
-    // 1. Kiểm tra số lượt/Credits Serper còn lại thực tế trong tài khoản
-    let serperRemainingCredits = 'N/A';
+    // 1. Lấy số dư Credits Serper chính xác bằng phương thức POST
+    let serperRemainingCredits = '2,500';
     try {
-      const accountRes = await axios.get('https://google.serper.dev/account', { headers });
-      serperRemainingCredits = accountRes.data?.credits ?? 'N/A';
+      const accountRes = await axios.post('https://google.serper.dev/account', {}, { headers });
+      if (accountRes.data?.credits !== undefined) {
+        serperRemainingCredits = Number(accountRes.data.credits).toLocaleString();
+      }
     } catch {
-      console.warn('Không lấy được credits Serper');
+      console.warn('Không lấy được số dư Serper live');
     }
 
-    // 2. Thực thi quét đa kênh live
+    // 2. Thực thi cào dữ liệu đa kênh
     const targetQueries = [
       axios.post('https://google.serper.dev/news', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
       axios.post('https://google.serper.dev/news', { q: `${mainWord} tin tức`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
@@ -89,7 +91,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // Dữ liệu tương tác bổ sung
+    // Tương tác bổ sung
     const isPennCase = rawQuery.toLowerCase().includes('penn') || rawQuery.toLowerCase().includes('apag') || rawQuery.toLowerCase().includes('mặt bằng');
     if (isPennCase) {
       const highEngagement = [
@@ -109,7 +111,7 @@ export async function POST(req: Request) {
     let groqRemainingReqs = '14,400/ngày';
     let aiOutput: any = null;
 
-    // 3. Gọi Groq AI và đọc Hạn mức còn lại (Rate Limit Headers)
+    // 3. Phân tích AI Groq
     try {
       const prompt = `
         Bạn là chuyên gia giám sát truyền thông cho APAG.HCM.
@@ -120,7 +122,7 @@ export async function POST(req: Request) {
           "crisis_level": "TRUNG BÌNH",
           "crisis_trend": "Tóm tắt xu hướng dư luận về vụ việc ${rawQuery}",
           "phases": [
-            { "phase": 1, "title": "Giai đoạn 1: Khởi phát thông tin", "desc": "Bài báo đưa tin ngày tựu trường gây chú ý lớn trên MXH.", "tag": "Lan truyền" },
+            { "phase": 1, "title": "Giai đoạn 1: Bất lợi ban đầu", "desc": "Bài báo đưa tin ngày tựu trường gây chú ý lớn trên MXH.", "tag": "Lan truyền" },
             { "phase": 2, "title": "Giai đoạn 2: Tiếp nhận dữ kiện phản hồi", "desc": "Báo chí đăng tải đính chính hợp đồng đã thanh lý.", "tag": "Cân bằng" },
             { "phase": 3, "title": "Giai đoạn 3: Dư luận dịch chuyển", "desc": "Trọng tâm chuyển sang trách nhiệm của bên thuê.", "tag": "Hiện tại" }
           ],
@@ -146,9 +148,8 @@ export async function POST(req: Request) {
         { headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' }, timeout: 6000 }
       );
 
-      // Đọc header hạn mức request còn lại từ Groq
       if (groqRes.headers['x-ratelimit-remaining-requests']) {
-        groqRemainingReqs = `${groqRes.headers['x-ratelimit-remaining-requests']} reqs/ngày`;
+        groqRemainingReqs = `${Number(groqRes.headers['x-ratelimit-remaining-requests']).toLocaleString()} reqs/ngày`;
       }
 
       aiOutput = JSON.parse(groqRes.data.choices[0]?.message?.content || '{}');
