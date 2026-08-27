@@ -38,7 +38,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 font-sans">
-      {/* Header hệ thống APAG.HCM */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-slate-800 pb-6 gap-4">
         <div>
           <div className="flex items-center gap-3">
@@ -82,17 +82,17 @@ export default function Home() {
         </div>
       )}
 
-      {/* 4 Thẻ KPI Tổng quan */}
+      {/* 4 Thẻ KPI */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
           <div className="flex justify-between items-center text-slate-400 mb-2">
-            <span className="text-sm font-medium">Báo chí & Trang tin</span>
+            <span className="text-sm font-medium">Bài báo & Trang tin</span>
             <Newspaper className="w-5 h-5 text-blue-400" />
           </div>
           <div className="text-3xl font-bold text-white">
             {data?.kpi_summary?.total_articles || '0'} <span className="text-lg text-slate-400 font-normal">URLs</span>
           </div>
-          <p className="text-xs text-slate-400 mt-2">Tổng số bài viết định danh thu thập được</p>
+          <p className="text-xs text-slate-400 mt-2">Bài viết định danh thu thập được</p>
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-5 rounded-xl shadow-lg">
@@ -136,14 +136,12 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Phần 1: Diễn biến 3 giai đoạn & Top nguồn tin */}
+      {/* Diễn biến 3 giai đoạn & Top nguồn tin */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-        
-        {/* Diễn biến 3 giai đoạn động */}
         <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
             <Clock className="w-5 h-5 text-blue-400" />
-            Diễn biến Thông tin theo 3 Giai đoạn
+            Diễn biến Thông tin theo Giai đoạn
           </h2>
 
           <div className="space-y-6 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-slate-800">
@@ -163,16 +161,15 @@ export default function Home() {
                 </div>
               ))
             ) : (
-              <p className="text-sm text-slate-500 italic pl-4">Nhấn "Quét KPI" để AI phân tích 3 giai đoạn diễn biến truyền thông...</p>
+              <p className="text-sm text-slate-500 italic pl-4">Nhấn "Quét KPI" để AI phân tích diễn biến truyền thông...</p>
             )}
           </div>
         </div>
 
-        {/* Top Nguồn tin nổi bật động */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
             <MessageSquare className="w-5 h-5 text-indigo-400" />
-            Nguồn Tin & Tương tác Nổi Bật
+            Top Nguồn Tin Thu Thập Được
           </h2>
 
           <div className="space-y-4">
@@ -193,19 +190,19 @@ export default function Home() {
         </div>
       </div>
 
-      {/* Phần 2: Danh sách bài viết vừa quét được */}
+      {/* Danh sách bài viết thu thập */}
       {data?.articles && data.articles.length > 0 && (
         <div className="mb-8 bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center justify-between">
             <span>Danh Sách Bài Viết Thu Thập Được ({data.articles.length} bài)</span>
-            <span className="text-xs font-normal text-slate-400">Sắp xếp theo độ liên quan</span>
+            <span className="text-xs font-normal text-slate-400">Tự động nhận diện nguồn & sắc thái</span>
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto pr-2">
             {data.articles.map((art: any, idx: number) => (
               <div key={idx} className="p-4 bg-slate-950 rounded-lg border border-slate-800 flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start gap-2 mb-2">
-                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-blue-300">
                       {art.source}
                     </span>
                     <span className={`text-xs px-2 py-0.5 rounded font-medium ${
@@ -232,14 +229,12 @@ export default function Home() {
         </div>
       )}
 
-      {/* Phần 3: Rủi ro & Kiến nghị xử lý động */}
+      {/* Rủi ro & Kiến nghị */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        
-        {/* Đánh giá rủi ro động */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-amber-400" />
-            Đánh giá Rủi ro đối với Đơn vị
+            Đánh giá Rủi ro Truyền thông
           </h2>
           <div className="space-y-3">
             {data?.risks?.length > 0 ? (
@@ -264,11 +259,10 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Kiến nghị xử lý động */}
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
           <h2 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            Kiến nghị Xử lý Tức thì
+            Kiến nghị Xử lý Truyền thông
           </h2>
           <ul className="space-y-2.5 text-sm text-slate-300">
             {data?.recommendations?.length > 0 ? (
@@ -283,7 +277,6 @@ export default function Home() {
             )}
           </ul>
         </div>
-
       </div>
     </div>
   );
