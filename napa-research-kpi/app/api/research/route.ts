@@ -27,13 +27,23 @@ function cleanUrl(url: string): string {
   }
 }
 
+// BỘ LỌC TỰ ĐỘNG LOẠI BỎ RÁC (XỔ SỐ, TỪ ĐIỂN, WIKIPEDIA)
+const JUNK_KEYWORDS = [
+  'xổ số', 'xsmn', 'xsmb', 'xskt', 'kqxs', 'vé số', 'dò vé số',
+  'từ điển', 'chữ số', 'nghĩa của từ', 'wikipedia', 'lô đề', 'giải đặc biệt'
+];
+
+function isJunkArticle(title: string, snippet: string, link: string): boolean {
+  const text = `${title} ${snippet} ${link}`.toLowerCase();
+  return JUNK_KEYWORDS.some((junk) => text.includes(junk));
+}
+
 export async function POST(req: Request) {
   try {
     const { query } = await req.json();
     if (!query) return NextResponse.json({ error: 'Từ khóa không được để trống' }, { status: 400 });
 
     const rawQuery = query.replace(/["']/g, '').trim();
-    const mainWord = rawQuery.split(' ')[0] || rawQuery;
     const serperKey = process.env.SERPER_API_KEY;
     const groqKey = process.env.GROQ_API_KEY;
 
@@ -43,16 +53,15 @@ export async function POST(req: Request) {
 
     const headers = { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' };
 
-    // 1. Quét dữ liệu 8 luồng (mỗi lần quét tiêu tốn đúng 8 Serper credits)
+    // 1. Quét dữ liệu giữ nguyên trọn vẹn cụm từ khóa (Không tách lẻ từ "số")
     const targetQueries = [
       axios.post('https://google.serper.dev/news', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/news', { q: `${mainWord} tin tức`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40, page: 1 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: `${mainWord} "thu hồi" OR "mặt bằng" OR "đóng cửa"`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: `${mainWord} site:facebook.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: `${mainWord} site:tiktok.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: `${mainWord} site:youtube.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
-      axios.post('https://google.serper.dev/search', { q: mainWord, gl: 'vn', hl: 'vi', num: 40, page: 2 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: `${rawQuery} tin tức`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: `${rawQuery} báo chí`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: `${rawQuery} site:facebook.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: `${rawQuery} site:tiktok.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: `${rawQuery} site:youtube.com`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
+      axios.post('https://google.serper.dev/search', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40, page: 2 }, { headers }).catch(() => null),
     ];
 
     const responses = await Promise.all(targetQueries);
@@ -67,13 +76,21 @@ export async function POST(req: Request) {
         const items = [...(res.data.organic || []), ...(res.data.news || [])];
         items.forEach((item: any) => {
           if (item.link) {
+            const title = item.title || '';
+            const snippet = item.snippet || item.snippetRaw || '';
+
+            // Loại bỏ bài viết nếu trùng từ khóa rác xổ số/từ điển
+            if (isJunkArticle(title, snippet, item.link)) {
+              return;
+            }
+
             const cleanedLink = cleanUrl(item.link);
             if (!articleMap.has(cleanedLink)) {
               const sourceName = detectSource(item.link, item.domain || item.source);
               sourceStats[sourceName] = (sourceStats[sourceName] || 0) + 1;
               articleMap.set(cleanedLink, {
-                title: item.title,
-                snippet: (item.snippet || item.snippetRaw || '').slice(0, 160),
+                title: title,
+                snippet: snippet.slice(0, 160),
                 link: item.link,
                 source: sourceName,
               });
@@ -83,7 +100,7 @@ export async function POST(req: Request) {
       }
     });
 
-    // 2. Lấy số dư tài khoản Serper thực tế & trừ đi lượng credits vừa dùng trong request này
+    // 2. Lấy số dư Credits Serper live
     let baseCredits = 2500;
     try {
       const accountRes = await axios.post('https://google.serper.dev/account', {}, { headers, timeout: 3000 });
@@ -94,26 +111,13 @@ export async function POST(req: Request) {
       console.warn('Serper live credits sync pending');
     }
 
-    // Tự động tính số dư giảm ngay lập tức
-    const remainingSerperCredits = Math.max(0, baseCredits - (successfulCalls || 8));
+    const remainingSerperCredits = Math.max(0, baseCredits - (successfulCalls || 7));
+    const uniqueArticles = Array.from(articleMap.values());
 
-    // Bổ sung dữ liệu tương tác
-    const isPennCase = rawQuery.toLowerCase().includes('penn') || rawQuery.toLowerCase().includes('apag') || rawQuery.toLowerCase().includes('mặt bằng');
-    if (isPennCase) {
-      const highEngagement = [
-        { title: 'Beatvn: Phụ huynh bất ngờ vì cơ sở PennSchool đóng cửa đúng ngày tựu trường', snippet: 'Khoảng 2.900 cảm xúc, 125 bình luận.', link: 'https://facebook.com/beatvn', source: 'Facebook' },
-        { title: 'Báo Tuổi Trẻ: Trường PennSchool bị thu hồi mặt bằng cơ sở Ba Tháng Hai', snippet: 'Khoảng 2.700 cảm xúc, 86 lượt chia sẻ.', link: 'https://tuoitre.vn', source: 'Báo Tuổi Trẻ' },
-        { title: 'VnExpress: Động thái mới vụ PennSchool ngưng hoạt động địa điểm 10 Ba Tháng Hai', snippet: 'Khoảng 1.800 cảm xúc, 28 bình luận.', link: 'https://vnexpress.net', source: 'Báo VnExpress' },
-      ];
-      highEngagement.forEach(post => {
-        if (!articleMap.has(post.link + post.title)) {
-          articleMap.set(post.link + post.title, post);
-          sourceStats[post.source] = (sourceStats[post.source] || 0) + 1;
-        }
-      });
+    if (uniqueArticles.length === 0) {
+      return NextResponse.json({ error: 'Không tìm thấy dữ liệu báo chí phù hợp với từ khóa này.' }, { status: 404 });
     }
 
-    const uniqueArticles = Array.from(articleMap.values());
     let groqRemainingReqs = '14,399/ngày';
     let aiOutput: any = null;
 
@@ -122,15 +126,16 @@ export async function POST(req: Request) {
       const prompt = `
         Bạn là chuyên gia giám sát truyền thông cho APAG.HCM.
         Phân tích dữ liệu truyền thông về từ khóa: "${rawQuery}".
+        Danh sách bài viết: ${JSON.stringify(uniqueArticles.slice(0, 25))}
         
         Trả về 1 chuỗi JSON chính xác:
         {
           "crisis_level": "TRUNG BÌNH",
           "crisis_trend": "Tóm tắt xu hướng dư luận về vụ việc ${rawQuery}",
           "phases": [
-            { "phase": 1, "title": "Giai đoạn 1: Bất lợi ban đầu", "desc": "Bài báo đưa tin ngày tựu trường gây chú ý lớn trên MXH.", "tag": "Lan truyền" },
-            { "phase": 2, "title": "Giai đoạn 2: Tiếp nhận dữ kiện phản hồi", "desc": "Báo chí đăng tải đính chính hợp đồng đã thanh lý.", "tag": "Cân bằng" },
-            { "phase": 3, "title": "Giai đoạn 3: Dư luận dịch chuyển", "desc": "Trọng tâm chuyển sang trách nhiệm của bên thuê.", "tag": "Hiện tại" }
+            { "phase": 1, "title": "Giai đoạn 1: Bất lợi ban đầu", "desc": "Sự việc gây chú ý lớn trên MXH.", "tag": "Lan truyền" },
+            { "phase": 2, "title": "Giai đoạn 2: Tiếp nhận dữ kiện phản hồi", "desc": "Báo chí đăng tải đính chính dữ kiện pháp lý.", "tag": "Cân bằng" },
+            { "phase": 3, "title": "Giai đoạn 3: Dư luận dịch chuyển", "desc": "Trọng tâm chuyển sang trách nhiệm các bên.", "tag": "Hiện tại" }
           ],
           "risks": [
             { "name": "1. Rủi ro giật gân từ tiêu đề báo chí", "desc": "Tiêu đề dễ khiến độc giả hiểu sai bản chất.", "level": "Trung bình" },
@@ -164,8 +169,8 @@ export async function POST(req: Request) {
     }
 
     const phases = aiOutput?.phases?.length ? aiOutput.phases : [
-      { phase: 1, title: 'Giai đoạn 1: Bất lợi ban đầu', desc: `Thông tin về ${rawQuery} lan truyền mạnh trên MXH.`, tag: 'Khởi phát' },
-      { phase: 2, title: 'Giai đoạn 2: Tiếp nhận thông tin phản hồi', desc: `Báo chí đưa tin đính chính dữ kiện pháp lý.`, tag: 'Làm rõ' },
+      { phase: 1, title: 'Giai đoạn 1: Khởi phát thông tin', desc: `Thông tin về ${rawQuery} lan truyền trên báo chí và MXH.`, tag: 'Khởi phát' },
+      { phase: 2, title: 'Giai đoạn 2: Tiếp nhận thông tin đính chính', desc: `Cung cấp thông tin hợp đồng và dữ kiện pháp lý rõ ràng.`, tag: 'Làm rõ' },
       { phase: 3, title: 'Giai đoạn 3: Dư luận ổn định', desc: `Trọng tâm chuyển sang trách nhiệm của các bên liên quan.`, tag: 'Hiện tại' }
     ];
 
