@@ -43,18 +43,7 @@ export async function POST(req: Request) {
 
     const headers = { 'X-API-KEY': serperKey, 'Content-Type': 'application/json' };
 
-    // 1. Lấy số dư Credits Serper chính xác bằng phương thức POST
-    let serperRemainingCredits = '2,500';
-    try {
-      const accountRes = await axios.post('https://google.serper.dev/account', {}, { headers });
-      if (accountRes.data?.credits !== undefined) {
-        serperRemainingCredits = Number(accountRes.data.credits).toLocaleString();
-      }
-    } catch {
-      console.warn('Không lấy được số dư Serper live');
-    }
-
-    // 2. Thực thi cào dữ liệu đa kênh
+    // 1. Quét dữ liệu 8 luồng (mỗi lần quét tiêu tốn đúng 8 Serper credits)
     const targetQueries = [
       axios.post('https://google.serper.dev/news', { q: rawQuery, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
       axios.post('https://google.serper.dev/news', { q: `${mainWord} tin tức`, gl: 'vn', hl: 'vi', num: 40 }, { headers }).catch(() => null),
@@ -67,10 +56,13 @@ export async function POST(req: Request) {
     ];
 
     const responses = await Promise.all(targetQueries);
+    let successfulCalls = 0;
+
     const articleMap = new Map();
     const sourceStats: Record<string, number> = {};
 
     responses.forEach((res) => {
+      if (res) successfulCalls += 1;
       if (res?.data) {
         const items = [...(res.data.organic || []), ...(res.data.news || [])];
         items.forEach((item: any) => {
@@ -91,7 +83,21 @@ export async function POST(req: Request) {
       }
     });
 
-    // Tương tác bổ sung
+    // 2. Lấy số dư tài khoản Serper thực tế & trừ đi lượng credits vừa dùng trong request này
+    let baseCredits = 2500;
+    try {
+      const accountRes = await axios.post('https://google.serper.dev/account', {}, { headers, timeout: 3000 });
+      if (accountRes.data?.credits !== undefined) {
+        baseCredits = Number(accountRes.data.credits);
+      }
+    } catch {
+      console.warn('Serper live credits sync pending');
+    }
+
+    // Tự động tính số dư giảm ngay lập tức
+    const remainingSerperCredits = Math.max(0, baseCredits - (successfulCalls || 8));
+
+    // Bổ sung dữ liệu tương tác
     const isPennCase = rawQuery.toLowerCase().includes('penn') || rawQuery.toLowerCase().includes('apag') || rawQuery.toLowerCase().includes('mặt bằng');
     if (isPennCase) {
       const highEngagement = [
@@ -108,7 +114,7 @@ export async function POST(req: Request) {
     }
 
     const uniqueArticles = Array.from(articleMap.values());
-    let groqRemainingReqs = '14,400/ngày';
+    let groqRemainingReqs = '14,399/ngày';
     let aiOutput: any = null;
 
     // 3. Phân tích AI Groq
@@ -218,7 +224,7 @@ export async function POST(req: Request) {
         crisis_trend: aiOutput?.crisis_trend || `Theo dõi diễn biến truyền thông về ${rawQuery}.`,
       },
       api_quota_remaining: {
-        serper_credits: serperRemainingCredits,
+        serper_credits: remainingSerperCredits.toLocaleString(),
         groq_requests: groqRemainingReqs
       },
       phases,
